@@ -1,0 +1,282 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>TO DO LIST</title>
+    <!-- Bootstrap CSS -->
+    <link href="https://stackpath.bootstrapcdn.com/bootstrap/4.5.2/css/bootstrap.min.css" rel="stylesheet">
+    <style>
+        .tache {
+            border: none;
+            color: black;
+        }
+
+        .dateTask,
+        .dateExecution {
+            border: none;
+        }
+
+        .completed {
+            background-color: #ccffcc;
+            color: white;
+        }
+
+        .completed input {
+            background-color: transparent;
+        }
+
+        .not-completed {
+            background-color: #ffcccc;
+            color: white;
+        }
+
+        .not-completed input {
+            background-color: transparent;
+        }
+
+        #notificationModal .modal-body {
+            max-height: 300px;
+            overflow-y: auto;
+        }
+
+        .notification-bell {
+            font-size: 30px;
+            cursor: pointer;
+            position: relative;
+        }
+
+        .notification-bell .badge {
+            position: absolute;
+            top: -5px;
+            right: -5px;
+            background-color: red;
+            color: white;
+            font-size: 12px;
+            padding: 5px;
+            border-radius: 50%;
+        }
+
+        .progress-bar {
+            height: 20px;
+        }
+    </style>
+</head>
+
+<body>
+    <div class="container mt-5">
+        <h1 class="text-center">TO DO LIST</h1>
+        <div class="row mb-3">
+            <div class="col-md-12 text-right">
+                <button id="addTaskBtn" class="btn btn-primary">Ajouter Tache</button>
+                <span class="notification-bell" id="notificationBell" data-toggle="modal" data-target="#notificationModal">
+                    🔔
+                    <span class="badge" id="notificationBadge" style="display: none;">1</span>
+                </span>
+            </div>
+        </div>
+        <table class="table table-bordered">
+            <thead class="thead-dark">
+                <tr>
+                    <th>#</th>
+                    <th>Case à cocher</th>
+                    <th>Tâche</th>
+                    <th>Date d'enregistrement</th>
+                    <th>Date d'exécution</th>
+                    <th>Heure d'exécution</th>
+                    <th>Actions</th>
+                </tr>
+            </thead>
+            <tbody id="taskTable">
+                <!-- Le contenu des tâches va être ajouté ici dynamiquement -->
+            </tbody>
+        </table>
+
+        <!-- Modal de notification -->
+        <div class="modal fade" id="notificationModal" tabindex="-1" role="dialog" aria-labelledby="notificationModalLabel" aria-hidden="true">
+            <div class="modal-dialog" role="document">
+                <div class="modal-content">
+                    <div class="modal-header">
+                        <h5 class="modal-title" id="notificationModalLabel">Notifications de tâches en retard</h5>
+                        <button type="button" class="close" data-dismiss="modal" aria-label="Close">
+                            <span aria-hidden="true">&times;</span>
+                        </button>
+                    </div>
+                    <div class="modal-body">
+                        <!-- Les notifications des tâches en retard s'affichent ici -->
+                        <ul id="lateTasksList"></ul>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Formulaire d'ajout de tâche -->
+        <div class="container mt-5 alert alert-info" style="display: none;" id="taskFormContainer">
+            <h1 class="text-center">FORMULAIRE D'AJOUT DE TACHE</h1>
+            <form id="taskForm" class="mt-4">
+                <div class="form-group">
+                    <label for="taskInput">Tâche à exécuter</label>
+                    <input type="text" class="form-control" id="taskInput" placeholder="Entrez la tâche" required>
+                </div>
+                <div class="form-group">
+                    <label for="executionDate">Date d'exécution prévue</label>
+                    <input type="date" class="form-control" id="executionDate" required>
+                </div>
+                <div class="form-group">
+                    <label for="executionTime">Heure d'exécution prévue</label>
+                    <input type="time" class="form-control" id="executionTime" required>
+                </div>
+                <button type="submit" class="btn btn-primary">Ajouter</button>
+            </form>
+        </div>
+        
+        <!-- Progression des tâches -->
+        <div class="mt-3">
+            <h3>Progression des tâches</h3>
+            <div class="progress">
+                <div id="progressBar" class="progress-bar" role="progressbar" style="width: 0%" aria-valuenow="0" aria-valuemin="0" aria-valuemax="100"></div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Bootstrap JS and dependencies -->
+    <script src="https://code.jquery.com/jquery-3.5.1.slim.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/@popperjs/core@2.5.4/dist/umd/popper.min.js"></script>
+    <script src="https://stackpath.bootstrapcdn.com/bootstrap/4.5.2/js/bootstrap.min.js"></script>
+
+    <script>
+        document.addEventListener('DOMContentLoaded', function () {
+
+            // Récupération des éléments du DOM
+            const addTaskBtn = document.getElementById('addTaskBtn');
+            const taskFormContainer = document.getElementById('taskFormContainer');
+            const taskForm = document.getElementById('taskForm');
+            const taskTable = document.getElementById('taskTable');
+            const notificationBell = document.getElementById('notificationBell');
+            const notificationBadge = document.getElementById('notificationBadge');
+            const progressBar = document.getElementById('progressBar');
+            let isEditing = false;
+            let editIndex = null;
+
+            // Affichage du formulaire
+            addTaskBtn.addEventListener('click', function () {
+                taskFormContainer.style.display = 'block';
+            });
+
+            // Soumettre le formulaire pour ajouter une tâche
+            taskForm.addEventListener('submit', function (e) {
+                e.preventDefault();
+                handleFormSubmit();
+            });
+
+            // Fonction pour ajouter une tâche
+            function handleFormSubmit() {
+                const taskInput = document.getElementById('taskInput').value;
+                const executionDate = document.getElementById('executionDate').value;
+                const executionTime = document.getElementById('executionTime').value;
+
+                if (taskInput.trim() !== "" && executionDate.trim() !== "" && executionTime.trim() !== "") {
+                    const dateNow = new Date().toISOString().split('T')[0];
+                    const deadline = new Date(executionDate + 'T' + executionTime + ':00').toISOString();
+
+                    const task = {
+                        taskInput: taskInput,
+                        executionDate: executionDate,
+                        executionTime: executionTime,
+                        dateNow: dateNow,
+                        deadline: deadline,
+                        completed: false
+                    };
+
+                    let tasks = JSON.parse(localStorage.getItem('tasks')) || [];
+                    if (isEditing) {
+                        tasks[editIndex] = task;
+                        taskForm.querySelector('button').textContent = 'Ajouter';
+                        isEditing = false;
+                        editIndex = null;
+                    } else {
+                        tasks.push(task);
+                    }
+
+                    localStorage.setItem('tasks', JSON.stringify(tasks));
+                    taskTable.innerHTML = '';
+                    loadTasks();
+
+                    taskFormContainer.style.display = 'none';
+                } else {
+                    alert("Veuillez remplir tous les champs.");
+                }
+            }
+
+            // Fonction pour ajouter une tâche à la table
+            function addTaskToTable(task, taskNumber, completed, index) {
+                const newRow = document.createElement('tr');
+                if (completed) {
+                    newRow.classList.add('completed');
+                } else {
+                    newRow.classList.add('not-completed');
+                }
+
+                newRow.innerHTML = `
+                    <th scope="row">${taskNumber}</th>
+                    <td><input type="checkbox" class="check" ${completed ? 'checked' : ''}></td>
+                    <td><input type="text" value="${task.taskInput}" class="tache" readonly></td>
+                    <td><input type="date" value="${task.dateNow}" class="dateTask" readonly></td>
+                    <td><input type="date" value="${task.executionDate}" class="dateExecution" readonly></td>
+                    <td><input type="time" value="${task.executionTime}" class="timeExecution" readonly></td>
+                    <td>
+                        <button class="btn btn-warning btn-sm" onclick="editTask(${index}, ${JSON.stringify(task)})">Modifier</button>
+                        <button class="btn btn-danger btn-sm" onclick="deleteTask(${index})">Supprimer</button>
+                    </td>
+                `;
+                taskTable.appendChild(newRow);
+                updateProgress();
+            }
+
+            // Charger les tâches depuis le stockage local
+            function loadTasks() {
+                let tasks = JSON.parse(localStorage.getItem('tasks')) || [];
+                tasks.forEach((task, index) => {
+                    const completed = new Date() > new Date(task.deadline);
+                    addTaskToTable(task, index + 1, completed, index);
+                });
+                checkLateTasks();
+            }
+
+            // Mettre à jour la progression
+            function updateProgress() {
+                let tasks = JSON.parse(localStorage.getItem('tasks')) || [];
+                let completedTasks = tasks.filter(task => task.completed).length;
+                let totalTasks = tasks.length;
+                let progress = (completedTasks / totalTasks) * 100;
+                progressBar.style.width = progress + '%';
+                progressBar.setAttribute('aria-valuenow', progress);
+            }
+
+            // Modifier une tâche
+            function editTask(index, task) {
+                isEditing = true;
+                editIndex = index;
+                document.getElementById('taskInput').value = task.taskInput;
+                document.getElementById('executionDate').value = task.executionDate;
+                document.getElementById('executionTime').value = task.executionTime;
+                taskFormContainer.style.display = 'block';
+            }
+
+            // Supprimer une tâche
+            function deleteTask(index) {
+                let tasks = JSON.parse(localStorage.getItem('tasks')) || [];
+                tasks.splice(index, 1);
+                localStorage.setItem('tasks', JSON.stringify(tasks));
+                taskTable.innerHTML = '';
+                loadTasks();
+            }
+
+            // Initialiser l'affichage des tâches
+            loadTasks();
+        });
+    </script>
+</body>
+
+</html>

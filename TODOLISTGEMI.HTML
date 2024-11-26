@@ -1,0 +1,263 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>TO DO LIST</title>
+    <!-- Bootstrap CSS -->
+    <link href="https://stackpath.bootstrapcdn.com/bootstrap/4.5.2/css/bootstrap.min.css" rel="stylesheet">
+    <style>
+        .tache {
+            border: none;
+            color: black;
+        }
+
+        .dateTask,
+        .dateExecution {
+            border: none;
+        }
+
+        .completed {
+            background-color: #ccffcc;
+            color: white;
+        }
+
+        .completed input {
+            background-color: transparent;
+        }
+
+        .not-completed {
+            background-color: #ffcccc;
+            color: white;
+        }
+
+        .not-completed input {
+            background-color: transparent;
+        }
+    </style>
+</head>
+
+<body>
+    <div class="container mt-5">
+        <h1 class="text-center">TO DO LIST</h1>
+        <div class="row mb-3">
+            <div class="col-md-12 text-right">
+                <button id="addTaskBtn" class="btn btn-primary">Ajouter Tache</button>
+            </div>
+        </div>
+        <table class="table table-bordered">
+            <thead class="thead-dark">
+                <tr>
+                    <th>#</th>
+                    <th>Case à cocher</th>
+                    <th>Tâche</th>
+                    <th>Date d'enregistrement</th>
+                    <th>Date d'exécution</th>
+                    <th>Actions</th>
+                </tr>
+            </thead>
+            <tbody id="taskTable">
+                <!-- Le contenu des tâches va être ajouté ici dynamiquement -->
+            </tbody>
+        </table>
+        <div class="container mt-5 alert alert-info" style="display: none;" id="taskFormContainer">
+            <h1 class="text-center">FORMULAIRE D'AJOUT DE TACHE</h1>
+            <form id="taskForm" class="mt-4">
+                <div class="form-group">
+                    <label for="taskInput">Tâche à exécuter</label>
+                    <input type="text" class="form-control" id="taskInput" placeholder="Entrez la tâche" required>
+                </div>
+                <div class="form-group">
+                    <label for="executionDate">Date d'exécution prévue</label>
+                    <input type="date" class="form-control" id="executionDate" required>
+                </div>
+                <button type="submit" class="btn btn-primary">Ajouter</button>
+            </form>
+        </div>
+    </div>
+
+    <!-- Bootstrap JS and dependencies -->
+    <!-- <script src="https://code.jquery.com/jquery-3.5.1.slim.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/@popperjs/core@2.5.4/dist/umd/popper.min.js"></script>
+    <script src="https://stackpath.bootstrapcdn.com/bootstrap/4.5.2/js/bootstrap.min.js"></script> -->
+    <script>
+        document.addEventListener('DOMContentLoaded', function () {
+
+            // Récupération des éléments du DOM
+            const addTaskBtn = document.getElementById('addTaskBtn');
+            const taskFormContainer = document.getElementById('taskFormContainer');
+            const taskForm = document.getElementById('taskForm');
+            const taskTable = document.getElementById('taskTable');
+            let isEditing = false; // Variable pour suivre si nous sommes en mode édition
+            //Variable pour procéder à la modification d'une tache
+            let editIndex = null; // Index de la tâche en cours de modification
+
+            // 1.- Affichage du formulaire et ajout de tâches
+            addTaskBtn.addEventListener('click', function () {
+                taskFormContainer.style.display = 'block';
+            });
+
+            taskForm.addEventListener('submit', function (e) {
+                e.preventDefault(); // Empêche le comportement par défaut du formulaire
+                handleFormSubmit();
+            });
+
+            //Fonction pour Ajout des Taches 
+            function handleFormSubmit() {
+                const taskInput = document.getElementById('taskInput').value;
+                const executionDate = document.getElementById('executionDate').value;
+
+                if (taskInput.trim() !== "" && executionDate.trim() !== "") {
+                    const dateNow = new Date().toISOString().split('T')[0];
+
+                    const task = {
+                        taskInput: taskInput,
+                        executionDate: executionDate,
+                        dateNow: dateNow,
+                        completed: false
+                    };
+
+                    let tasks = [];
+                    const storedTasks = localStorage.getItem('tasks');
+                    if (storedTasks) {
+                        tasks = JSON.parse(storedTasks);
+                    }
+
+                    if (isEditing) {
+                        tasks[editIndex] = task;
+                        taskForm.querySelector('button').textContent = 'Ajouter';
+                        isEditing = false;
+                        editIndex = null;
+                    } else {
+                        tasks.push(task);
+                    }
+
+                    localStorage.setItem('tasks', JSON.stringify(tasks));
+                    taskTable.innerHTML = '';
+                    loadTasks();
+                    taskFormContainer.style.display = 'none';
+                    // Réinitialiser les champs du formulaire
+                    document.getElementById('taskInput').value = '';
+                    document.getElementById('executionDate').value = '';
+                } else {
+                    alert("Veuillez remplir tous les champs avant de soumettre le formulaire.");
+                }
+            }
+
+
+            // 2. Gestion des tâches : case à cocher, modification et suppression
+
+            // Fonction pour ajouter une tâche au tableau
+            function addTaskToTable(task, taskNumber, completed) {
+                const newRow = document.createElement('tr');
+                // newRow.classList.add(completed ? 'completed' : 'not-completed');
+                if (completed) {
+                    newRow.classList.add('completed');
+                } else {
+                    newRow.classList.add('not-completed');
+                }
+
+                newRow.innerHTML = `
+            <th scope="row">${taskNumber}</th>
+            <td><input type="checkbox" class="check" ${completed ? 'checked' : ''}></td>
+            <td><input type="text" value="${task.taskInput}" class="tache" readonly></td>
+            <td><input type="date" value="${task.dateNow}" class="dateTask" readonly></td>
+            <td><input type="date" value="${task.executionDate}" class="dateExecution" readonly></td>
+            <td>
+                <button class="btn btn-success btn-sm">Modifier</button>
+                <button class="btn btn-danger btn-sm">Supprimer</button>
+            </td>
+        `;
+
+                // Écouter les changements de l'état de la case à cocher
+                newRow.querySelector('.check').addEventListener('change', function () {
+                    handleCheckboxChange(this.checked, taskNumber - 1, newRow);
+                    //this fait référence à l'Input à cocher 
+                    //checked est une propriété booléenne de l'objet HTMLInputElement qui représente la case à cocher
+                });
+
+                // Écouter les clics sur le bouton "Modifier"
+                newRow.querySelector('.btn-success').addEventListener('click', function () {
+                    editTask(taskNumber - 1);
+                });
+
+                // Écouter les clics sur le bouton "Supprimer"
+                newRow.querySelector('.btn-danger').addEventListener('click', function () {
+                    deleteTask(taskNumber - 1);
+                });
+
+                taskTable.appendChild(newRow);
+            }
+
+
+            // Fonction pour gérer le changement d'état de la case à cocher
+            function handleCheckboxChange(isChecked, index, row) {
+                // classList.toogle utilisé pour basculer entre l'ajout et la suppression d'une classe
+                //classList.toggle('completed', isChecked) ajoute la classe completed si isChecked est true et la supprime si isChecked est false.
+                row.classList.toggle('completed', isChecked);
+                //classList.toggle('not-completed', !isChecked) ajoute la classe not-completed si !isChecked est true et la supprime si !isChecked est false
+                row.classList.toggle('not-completed', !isChecked);
+                updateTaskCompletion(index, isChecked);
+            }
+
+            // Met à jour l'état d'achèvement de la tâche dans le localStorage
+            function updateTaskCompletion(index, completed) {
+                const storedTasks = localStorage.getItem('tasks');
+                if (storedTasks) {
+                    const tasks = JSON.parse(storedTasks);
+                    tasks[index].completed = completed;
+                    localStorage.setItem('tasks', JSON.stringify(tasks));
+                }
+            }
+
+
+            // Modifier une tâche
+            function editTask(index) {
+                const storedTasks = localStorage.getItem('tasks');
+                if (storedTasks) {
+                    const tasks = JSON.parse(storedTasks);
+                    const task = tasks[index];
+
+                    document.getElementById('taskInput').value = task.taskInput;
+                    document.getElementById('executionDate').value = task.executionDate;
+
+                    taskForm.querySelector('button').textContent = 'Mettre à jour';
+                    taskFormContainer.style.display = 'block';
+
+                    isEditing = true;
+                    editIndex = index;
+                }
+            }
+
+            // Supprimer une tâche
+            function deleteTask(index) {
+                const storedTasks = localStorage.getItem('tasks');
+                if (storedTasks) {
+                    let tasks = JSON.parse(storedTasks);
+                    tasks.splice(index, 1);
+
+                    localStorage.setItem('tasks', JSON.stringify(tasks));
+                    taskTable.innerHTML = '';
+                    loadTasks();
+                }
+            }
+
+            // 3. Stockage des tâches et chargement initial
+            function loadTasks() {
+                const storedTasks = localStorage.getItem('tasks');
+                if (storedTasks) {
+                    const tasks = JSON.parse(storedTasks);
+                    tasks.forEach((task, index) => {
+                        addTaskToTable(task, index + 1, task.completed);
+                    });
+                }
+            }
+
+            loadTasks(); // Charger les tâches au démarrage
+        });
+
+    </script>
+</body>
+
+</html>
